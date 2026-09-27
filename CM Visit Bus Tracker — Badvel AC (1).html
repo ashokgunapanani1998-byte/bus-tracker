@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CM Visit Bus Tracker — Badvel AC</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚌</text></svg>">
+<style>
+:root{
+  --bg:#f4f5f7; --card:#ffffff; --text:#1a1d23; --sub:#6b7280; --border:#e5e7eb;
+  --accent:#2563eb; --pending:#9ca3af; --started:#f59e0b; --reached:#10b981; --returned:#6366f1;
+  --pending-bg:#f3f4f6; --started-bg:#fef3c7; --reached-bg:#d1fae5; --returned-bg:#e0e7ff;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111318; --card:#1a1d24; --text:#e8eaed; --sub:#9aa0aa; --border:#2b2f38;
+    --pending-bg:#242830; --started-bg:#3a2f10; --reached-bg:#0e3327; --returned-bg:#20204a;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111318; --card:#1a1d24; --text:#e8eaed; --sub:#9aa0aa; --border:#2b2f38;
+  --pending-bg:#242830; --started-bg:#3a2f10; --reached-bg:#0e3327; --returned-bg:#20204a;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+header{position:sticky;top:0;top:env(safe-area-inset-top,0px);background:var(--bg);border-bottom:1px solid var(--border);padding:14px 16px;z-index:10;}
+h1{font-size:17px;margin:0 0 2px;}
+.sub{color:var(--sub);font-size:12.5px;}
+.wrap{max-width:1000px;margin:0 auto;padding:12px 12px 40px;}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0;}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;}
+.stat .n{font-size:20px;font-weight:700;}
+.stat .l{font-size:11px;color:var(--sub);margin-top:2px;}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+select,input[type=text]{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;flex:1;min-width:120px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;}
+.row1{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.village{font-weight:600;font-size:14.5px;}
+.mandal{color:var(--sub);font-size:12px;}
+.pill{font-size:11px;padding:3px 9px;border-radius:99px;font-weight:600;white-space:nowrap;}
+.pill.pending{background:var(--pending-bg);color:var(--pending);}
+.pill.started{background:var(--started-bg);color:var(--started);}
+.pill.reached{background:var(--reached-bg);color:var(--reached);}
+.pill.returned{background:var(--returned-bg);color:var(--returned);}
+.meta{font-size:12px;color:var(--sub);margin-top:6px;line-height:1.6;}
+.meta b{color:var(--text);font-weight:500;}
+.actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+button.act{border:none;border-radius:8px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;color:#fff;}
+button.act:disabled{opacity:.35;cursor:default;}
+.b-start{background:var(--started);} .b-reach{background:var(--reached);} .b-return{background:var(--returned);} .b-reset{background:var(--pending);}
+.ts{font-size:10.5px;color:var(--sub);}
+.empty{text-align:center;color:var(--sub);padding:30px;}
+.savebar{position:fixed;bottom:0;left:0;right:0;background:var(--accent);color:#fff;text-align:center;padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px));font-size:12px;transform:translateY(100%);transition:transform .3s;}
+.savebar.show{transform:translateY(0);}
+</style>
+</head>
+<body>
+<header>
+  <h1>🚌 CM Visit Mobilisation Tracker</h1>
+  <div class="sub">Badvel Assembly Constituency · Destination: Varikuntapadu · 29-09-2026</div>
+</header>
+<div class="wrap">
+  <div class="summary" id="summary"></div>
+  <div class="controls">
+    <select id="mandalFilter"><option value="">All Mandals</option></select>
+    <select id="statusFilter">
+      <option value="">All Statuses</option>
+      <option value="pending">Not Started</option>
+      <option value="started">Started</option>
+      <option value="reached">Reached</option>
+      <option value="returned">Returned</option>
+    </select>
+    <input type="text" id="search" placeholder="Search village, driver, bus no...">
+  </div>
+  <div id="list"></div>
+</div>
+<div class="savebar" id="savebar">Saving update for everyone…</div>
+<script id="bus-data" type="application/json">[{"id":1,"mandal":"ATLUR","village":"ATLUR","start":"ATLUR","inch":"VENUGOPAL","inchNum":"9705150840","busInch":"NARAYANA","busInchNum":"9866807138","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":2,"mandal":"ATLUR","village":"ATLUR","start":"ATLUR","inch":"SUJATHA","inchNum":"8374727216","busInch":"RUSHIKESAVA","busInchNum":"9704862844","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":3,"mandal":"ATLUR","village":"KUMBAGIRI","start":"KUMBAGIRI","inch":"JULIYANAMMA","inchNum":"9110596472","busInch":"THIRUPALAIAH","busInchNum":"6301501696","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":4,"mandal":"ATLUR","village":"KUMBAGIRI","start":"KUMBAGIRI","inch":"RENUKA","inchNum":"90000027728","busInch":"SIVAIAH","busInchNum":"8328439914","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":5,"mandal":"ATLUR","village":"KONDUR","start":"KONDUR","inch":"ADHILAKSHMI","inchNum":"9381361519","busInch":"NAGLAAKSHMI","busInchNum":"6304581428","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":6,"mandal":"ATLUR","village":"REDDYPALLI","start":"REDDYPALLI","inch":"ADHILAKSHMI","inchNum":"7702004931","busInch":"PENCHALASIVA","busInchNum":"7702070459","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":7,"mandal":"ATLUR","village":"TAMBALLAGONFHI","start":"TAMBALLAGONFHI","inch":"PRAMEELA","inchNum":"6304478552","busInch":"THIRUPALAIAH","busInchNum":"6301501696","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":8,"mandal":"ATLUR","village":"MADAPURU","start":"MADAPURU","inch":"SIVAPRAYA","inchNum":"9182648120","busInch":"RAMIREDDY","busInchNum":"9000411067","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":9,"mandal":"ATLUR","village":"KAMALAKURU","start":"KAMALAKURU","inch":"MADHAVI","inchNum":"6281598488","busInch":"KIRANKUMAR REDDY","busInchNum":"6300907400","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":10,"mandal":"ATLUR","village":"MANYAMVARIPALLI","start":"MANYAMVARIPALLI","inch":"SUBHADRA","inchNum":"9381319475","busInch":"SUDHAKAR","busInchNum":"7780158406","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":11,"mandal":"ATLUR","village":"KAMASAMUDRAM","start":"KAMASAMUDRAM","inch":"SUJATHA","inchNum":"8919430178","busInch":"GOPALAIAH","busInchNum":"7619361891","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":12,"mandal":"ATLUR","village":"MUTHUKUR","start":"MUTHUKUR","inch":"HYMAVATHI","inchNum":"6300636958","busInch":"IVJAYALAKSHI","busInchNum":"9701352982","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":13,"mandal":"ATLUR","village":"VEMALURU","start":"VEMALURU","inch":"DHANALAKSHMI","inchNum":"9502783991","busInch":"RAMASUBAIAH","busInchNum":"7995858397","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":14,"mandal":"B KODUR","village":"PRABHALAVEEDU","start":"PRABHALAVEEDU","inch":"SHARIFF","inchNum":"7893700156","busInch":"SHARIFF","busInchNum":"7893700156","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":15,"mandal":"B KODUR","village":"THANGEDUPALLI","start":"","inch":"G SREENIVASULU","inchNum":"9014425569","busInch":"","busInchNum":"","busNo":"","driver":"","driverNum":"","persons":0,"status":"pending","ts":{}},{"id":16,"mandal":"B KODUR","village":"THUMMALAPALLI","start":"SIDDUGARIPALLI","inch":"K CHOWDIREDDY","inchNum":"9381869861","busInch":"OBIAH","busInchNum":"8897673630","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":17,"mandal":"B KODUR","village":"PEDULLAPALLI","start":"","inch":"Y SANKAR REDDY","inchNum":"8660356081","busInch":"","busInchNum":"","busNo":"","driver":"","driverNum":"","persons":0,"status":"pending","ts":{}},{"id":18,"mandal":"B KODUR","village":"MEKAVARIPALLI","start":"MEKAVARIPALLI","inch":"U NARASMIHULU","inchNum":"9381699512","busInch":"RAMIAH","busInchNum":"9182485142","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":19,"mandal":"B KODUR","village":"MEKAVARIPALLI","start":"","inch":"RAMIAH","inchNum":"9182485142","busInch":"","busInchNum":"","busNo":"","driver":"","driverNum":"","persons":0,"status":"pending","ts":{}},{"id":20,"mandal":"B KODUR","village":"B KODUR","start":"GUNTHAPALLI","inch":"RAMANA REDDY","inchNum":"8297599283","busInch":"RAMANA REDDY","busInchNum":"8297599283","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":21,"mandal":"B KODUR","village":"B KODUR","start":"","inch":"K SUBBA REDDY","inchNum":"8247869234","busInch":"","busInchNum":"","busNo":"","driver":"","driverNum":"","persons":0,"status":"pending","ts":{}},{"id":22,"mandal":"B KODUR","village":"RAMASAMUDRAM","start":"RAMASAMUDRAM","inch":"UPENDRA","inchNum":"8143545125","busInch":"JAYAPAL","busInchNum":"8367282900","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":23,"mandal":"B KODUR","village":"","start":"","inch":"JAYAPAL","inchNum":"8367282900","busInch":"","busInchNum":"","busNo":"","driver":"","driverNum":"","persons":0,"status":"pending","ts":{}},{"id":24,"mandal":"B KODUR","village":"MUNELLI","start":"MUNELLI","inch":"GURIAH","inchNum":"9908587635","busInch":"GURIAH","busInchNum":"9908587635","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":25,"mandal":"B KODUR","village":"","start":"","inch":"B NARAYANA REDDY","inchNum":"9347555707","busInch":"","busInchNum":"","busNo":"","driver":"","driverNum":"","persons":0,"status":"pending","ts":{}},{"id":26,"mandal":"B KODUR","village":"MUNELLI","start":"RAJUPALEM","inch":"RAMACHANDRIAH","inchNum":"8297649538","busInch":"RAMACHANDRIAH","busInchNum":"8297649538","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":27,"mandal":"B KODUR","village":"","start":"","inch":"VENKATRAMI REDDY","inchNum":"7659848074","busInch":"","busInchNum":"","busNo":"","driver":"","driverNum":"","persons":0,"status":"pending","ts":{}},{"id":28,"mandal":"B KODUR","village":"ITHARAMPETA","start":"SIRIGIRIPALLI","inch":"NAGOOR BASHA","inchNum":"6304371739","busInch":"NAGOOR BASHA","busInchNum":"6304371739","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":29,"mandal":"B KODUR","village":"","start":"","inch":"S VENKATA RAMANA","inchNum":"6300297720","busInch":"","busInchNum":"","busNo":"","driver":"","driverNum":"","persons":0,"status":"pending","ts":{}},{"id":30,"mandal":"B KODUR","village":"PAYALAKUNTA","start":"","inch":"","inchNum":"","busInch":"","busInchNum":"","busNo":"","driver":"","driverNum":"","persons":0,"status":"pending","ts":{}},{"id":31,"mandal":"B KODUR","village":"ITHARAMPETA","start":"AYYAVARIPALLI","inch":"G MADDIAH","inchNum":"9440851735","busInch":"CHENDRAYUDU","busInchNum":"9010051002","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":32,"mandal":"B KODUR","village":"","start":"","inch":"CHENDRAYUDU","inchNum":"8187057177","busInch":"","busInchNum":"","busNo":"","driver":"","driverNum":"","persons":0,"status":"pending","ts":{}},{"id":33,"mandal":"Badvel","village":"Putayapalli","start":"Putayapalli Sachivalayam","inch":"Sai Sri","inchNum":"7989949178","busInch":"Sai Sri","busInchNum":"7989949178","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":34,"mandal":"Badvel","village":"Chintala Cheruvu","start":"Chintala Cheruvu Sachivalayam","inch":"Dayanidhi","inchNum":"8008303197","busInch":"Venkata Subbareddy","busInchNum":"9494507455","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":35,"mandal":"Badvel","village":"Rajupalem","start":"Rajupalem Sachivalayam","inch":"Daniel","inchNum":"9000404656","busInch":"C Rama Subbareddy","busInchNum":"6301463068","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":36,"mandal":"Badvel","village":"Thippanapalli","start":"Thippanapalli Sachivalayam","inch":"Nagendra","inchNum":"7702070844","busInch":"K V Subbareddy","busInchNum":"9381900335","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":37,"mandal":"Badvel","village":"Kongalaveedu","start":"Uppathivaripalli","inch":"K. Madhusudhana Reddy","inchNum":"7702070064","busInch":"G Viswanath","busInchNum":"8008215212","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":38,"mandal":"Badvel","village":"Veerapalli","start":"Veerapalli","inch":"T  Poornima","inchNum":"7702070456","busInch":"Karna","busInchNum":"9951413129","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":39,"mandal":"Badvel","village":"Veerapalli","start":"Jogireddigaripalli","inch":"Lakshmi Devi","inchNum":"9676719729","busInch":"Danam","busInchNum":"6301211982","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":40,"mandal":"Badvel","village":"A.R. Puram","start":"A.R. Puram Sachivalayam","inch":"Subbarayudu","inchNum":"9000404666","busInch":"Madhusudhan Varma","busInchNum":"8499902999","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":41,"mandal":"Badvel","village":"T.V. Puram","start":"T.V. Puram Sachivalayam","inch":"Narasimha","inchNum":"9381456900","busInch":"Subadra","busInchNum":"9392772586","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":42,"mandal":"Badvel","village":"Vanampula","start":"Vanampula Sachivalayam","inch":"Sulochana","inchNum":"6300851736","busInch":"G Jayamma","busInchNum":"9908320701","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":43,"mandal":"BADVEL Urban","village":"ABBARADHI VEEDHI","start":"Maseed, Porumamilla Road","inch":"SHAIK CHANDINI","inchNum":"8309892210","busInch":"Padilam Vaishno Devi","busInchNum":"7207959400","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":44,"mandal":"BADVEL Urban","village":"AGRAHARAM","start":"ARCHI, AGRAHARAM","inch":"PODILI LAKSHMI DEVI","inchNum":"9398371702","busInch":"AKULA VENKATA SUHASINI","busInchNum":"9581936107","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":45,"mandal":"BADVEL Urban","village":"ANJANEYA NAGAR","start":"FATHIMA SCHOOL","inch":"UPPALAPATI SREE LAKSHMI","inchNum":"9490001779","busInch":"NAGA VENKATA NARASAIAH","busInchNum":"9985330457","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":46,"mandal":"BADVEL Urban","village":"ASHOK NAGAR","start":"PARAMDHAMAYYA COMPLEXS, DUDEKULAPALLI","inch":"SOMESULA MANASA","inchNum":"9110586805","busInch":"JAJIM VENKOJI RAO","busInchNum":"9490039233","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":47,"mandal":"BADVEL Urban","village":"BHAVANARAYANA NAGAR","start":"GUNTHA PALLI SANDU OPP ROAD","inch":"Nookala Parvathi","inchNum":"9000408922","busInch":"NAGADASARI CHINNAIAH","busInchNum":"8500459727","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":48,"mandal":"BADVEL Urban","village":"DUDEKULA VEEDHI","start":"GANDHI BOMMA CIRCLE","inch":"Shaik Farhana","inchNum":"7893067803","busInch":"THRIVENI BOJJA","busInchNum":"9346862908","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":49,"mandal":"BADVEL Urban","village":"GANDLAVEEDHI","start":"ANJANEYA SWAMY TEMPLE, GANDLAVEEDHI.","inch":"B.PADMA","inchNum":"9000409624","busInch":"SOLANKI KANAKADURGA","busInchNum":"6305932942","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":50,"mandal":"BADVEL Urban","village":"GUNTHA PALLI","start":"GUNTHAPALLI SACHIVALAYAM","inch":"A.ADILAKSHMI","inchNum":"9652546541","busInch":"SIDDU SUBHASHINI","busInchNum":"9347628510","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":51,"mandal":"BADVEL Urban","village":"KUMMARA KOTTALU","start":"SUGAR FACTORY","inch":"PALAGIRI INDIRA","inchNum":"8125544735","busInch":"Doddipalle Sridhar","busInchNum":"9440640071\n7702070034","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":52,"mandal":"BADVEL Urban","village":"MADAKALAVARI PALLI","start":"SRI VIDYA SCHOOL, MARTHOMA NAGAR","inch":"N.SRIDEVI","inchNum":"7659967163","busInch":"Adiboyina Bala Chandrudu","busInchNum":"9441972404","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":53,"mandal":"BADVEL Urban","village":"MAHABOOB NAGAR","start":"NELLORE ROAD PETROL BUNK","inch":"BRUNGI SIVA LAKSHMI","inchNum":"6302188705","busInch":"L.RAMA MOHAN REDDY","busInchNum":"9666118972","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":54,"mandal":"BADVEL Urban","village":"PUSALAWADA","start":"BC HOSTEL PUSALAWADA","inch":"Gumma Lakshmi Devi","inchNum":"6303146055","busInch":"Uppaluru Ramamohan","busInchNum":"6281274105","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":55,"mandal":"BADVEL Urban","village":"SEELAMVARI PALLI","start":"Lakshmi Palem","inch":"Eedi Hemalatha","inchNum":"9398370116","busInch":"Yambadi Premalatha","busInchNum":"9110730828","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":56,"mandal":"BADVEL Urban","village":"SIVANAGAR","start":"Lakshmi Devi Hospital","inch":"Yegu Veera Maha Lakshmi","inchNum":"8309069716","busInch":"TANGA MUDDUL KRISHNAIAH","busInchNum":"9949150362","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":57,"mandal":"BADVEL Urban","village":"SKD NAGAR","start":"Opp. NGO COLONY ROAD","inch":"Nagularapu Siromani","inchNum":"8074476322","busInch":"NAGIPOGU RAMAIAH","busInchNum":"9848472343","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":58,"mandal":"BADVEL Urban","village":"SURENDRA NAGAR","start":"RAMA SWAMY TEMPLE","inch":"VOOTLA RAJESWARI","inchNum":"9440564179","busInch":"VEERAPALLI SURESH REDDY","busInchNum":"8897782578","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":59,"mandal":"BADVEL Urban","village":"THOTTIGARI PALLI","start":"GOVT Hospital, Thottigari palli","inch":"BIJIVEMULA RAMADEVI","inchNum":"8838097535","busInch":"KASULA SUDHARSHAN","busInchNum":"9154189418","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":60,"mandal":"BADVEL Urban","village":"VALLELAVARI PALLE","start":"Ramapuram","inch":"BANDI KATTU PRAMEELA","inchNum":"7674088914","busInch":"DAMERLA SIVAIAH","busInchNum":"9703866345","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":61,"mandal":"BADVEL Urban","village":"VENKATAIAH NAGAR","start":"TTD KALYANA MANDAPAM","inch":"Shaik Parveen","inchNum":"7780123564","busInch":"Shaik Mahaboob Sharief","busInchNum":"8333051836","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":62,"mandal":"BADVEL Urban","village":"VIDYA NAGAR","start":"RTO OFFICE SANDU","inch":"KURAKU SARASWATHI","inchNum":"6303964934","busInch":"RANGANAYAKULU SUNNAPU","busInchNum":"9704435934","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":63,"mandal":"GOPAVARAM","village":"GOPAVARAM","start":"GOPAVARAM","inch":"KUMARI","inchNum":"6300168425","busInch":"SUBBAIAH","busInchNum":"9000404652","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":64,"mandal":"GOPAVARAM","village":"BRAMHANAPALLI","start":"BRAMHANAPALLI","inch":"RENUKA","inchNum":"6281866146","busInch":"ARJUN","busInchNum":"9963131469","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":65,"mandal":"GOPAVARAM","village":"RACHAYAPETA","start":"RACHAYAPETA","inch":"JAYAKUMARI","inchNum":"63001562152","busInch":"RAVI","busInchNum":"9000404662","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":66,"mandal":"GOPAVARAM","village":"BETHAYAPALLI","start":"BETHAYAPALLI","inch":"MUNEIAH","inchNum":"7013949766","busInch":"MUNEIAH","busInchNum":"7013949766","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":67,"mandal":"GOPAVARAM","village":"SANDRAPALLI","start":"SANDRAPALLI","inch":"SREENU","inchNum":"7702070311","busInch":"SREENU","busInchNum":"7702070311","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":68,"mandal":"GOPAVARAM","village":"SANDRAPALLI","start":"RAMAPURAM","inch":"PRASAD","inchNum":"9491515389","busInch":"SANKAR","busInchNum":"9441151153","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":69,"mandal":"GOPAVARAM","village":"KALUVAPALLI","start":"KALUVAPALLI","inch":"Y SINGARAIAH","inchNum":"8328141343","busInch":"Y SINGARAIAH","busInchNum":"8328141343","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":70,"mandal":"KALASAPADU","village":"RAMAPURAM","start":"REDDYPALLI","inch":"P YESU RATHNAM","inchNum":"8096821407","busInch":"P YESU RATHNAM","busInchNum":"8096821407","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":71,"mandal":"KALASAPADU","village":"THELLAPADU","start":"THELLAPADU","inch":"M SUBHASINI","inchNum":"7032795014","busInch":"M SUBHASINI","busInchNum":"7032795014","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":72,"mandal":"KALASAPADU","village":"Chennupalli","start":"Sachivalayam","inch":"B Pandu","inchNum":"9505665044","busInch":"B Pandu","busInchNum":"9505665044","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":73,"mandal":"KALASAPADU","village":"Kalasapadu","start":"Sachivalayam","inch":"Kondaiah","inchNum":"9949849989","busInch":"Kondaiah","busInchNum":"9949849989","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":74,"mandal":"KALASAPADU","village":"MAHANANDHIPALLI","start":"MAHANADHIPALLI","inch":"T.subramanyam","inchNum":"9492408668","busInch":"T.Subramanyam","busInchNum":"9492408668","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":75,"mandal":"KALASAPADU","village":"PIDUGUPALLI","start":"PIDUGUPALLI","inch":"G sunilkumar","inchNum":"9642507604","busInch":"G.Sunilkumar","busInchNum":"9642507604","busNo":"","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":76,"mandal":"Porumamilla","village":"Akkalreddipalle","start":"Akkalreddipalle Sachivalayam","inch":"Guru Pavan Kalyan","inchNum":"6281069924","busInch":"Obuesu","busInchNum":"7729882603","busNo":"1","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":77,"mandal":"Porumamilla","village":"Challagirigella","start":"Challagirigella Sachivalayam","inch":"M.RamaDevi","inchNum":"8247889431","busInch":"Rusheendra","busInchNum":"9381587344","busNo":"2","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":78,"mandal":"Porumamilla","village":"Dammanapalle","start":"Dammanapalle Sachivalayam","inch":"A.RaviKumar","inchNum":"6300016201","busInch":"Vijayalakshmi","busInchNum":"9505358090","busNo":"3","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":79,"mandal":"Porumamilla","village":"Dammanapalle","start":"Dammanapalle Sachivalayam","inch":"S Obaiah","inchNum":"9100975573","busInch":"Vanaja","busInchNum":"9063630031","busNo":"4","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":80,"mandal":"Porumamilla","village":"Ganugapenta","start":"Ganugapenta Sachivalayam","inch":"S.Rammohan","inchNum":"9032475541","busInch":"V.Danamma","busInchNum":"8106694035","busNo":"5","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":81,"mandal":"Porumamilla","village":"Kavalakuntla","start":"Kavalakuntla Sachivalayam","inch":"V.BALUDU","inchNum":"9959828261","busInch":"Yesurathnam","busInchNum":"9014322301","busNo":"6","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":82,"mandal":"Porumamilla","village":"Porumamilla","start":"Porumamilla 1 Sachivalayam","inch":"Y.Rajiniprasad","inchNum":"7671078534","busInch":"Vijayamma","busInchNum":"9666064959","busNo":"7","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":83,"mandal":"Porumamilla","village":"Porumamilla","start":"Porumamilla 2 Sachivalayam","inch":"T.BharathKumar","inchNum":"9493350205","busInch":"Suhasini","busInchNum":"7396358770","busNo":"8","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":84,"mandal":"Porumamilla","village":"Porumamilla","start":"Porumamilla 3 Sachivalayam","inch":"Ramachandrudu","inchNum":"9000632041","busInch":"Kalil","busInchNum":"8179851198","busNo":"9","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":85,"mandal":"Porumamilla","village":"Porumamilla","start":"Porumamilla 4 Sachivalayam","inch":"Subramanyam","inchNum":"9490989590","busInch":"Sheelar","busInchNum":"8500195004","busNo":"10","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":86,"mandal":"Porumamilla","village":"Musalreddipalle","start":"Musalreddipalle Sachivalayam","inch":"K.Venkateshwarlu","inchNum":"6301981810","busInch":"Kalpana","busInchNum":"9553069286","busNo":"11","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":87,"mandal":"Porumamilla","village":"Pulliveedu","start":"Boppapuram Main Road","inch":"B.Kavitha","inchNum":"6303277163","busInch":"Srilakshmi","busInchNum":"7989410132","busNo":"12","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":88,"mandal":"Porumamilla","village":"Rajasahebpeta","start":"Rangasamudram 1 Sachivalayam","inch":"B Narayana Swamy","inchNum":"7036631641","busInch":"Nagaraju","busInchNum":"8919342691","busNo":"13","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":89,"mandal":"Porumamilla","village":"Ranga Samudram 1","start":"Ranga Samudram 1 Sachivalayam","inch":"B.DASTAGIRAMMA","inchNum":"8790772702","busInch":"Vani","busInchNum":"7660819262","busNo":"14","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":90,"mandal":"Porumamilla","village":"Ranga Samudram 1","start":"Ranga Samudram 2 Sachhivalayam","inch":"B.DASTAGIRAMMA","inchNum":"8790772702","busInch":"Rajeswari","busInchNum":"8688583887","busNo":"15","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":91,"mandal":"Porumamilla","village":"Ranga Samudram 2","start":"Ranga Samudram 2 Sachivalayam","inch":"B.NARAYANA SWAMY","inchNum":"7036631641","busInch":"Kumari","busInchNum":"7013668834","busNo":"16","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":92,"mandal":"Porumamilla","village":"Sancharla","start":"Sancharla Sachivalayam","inch":"B.Savitri","inchNum":"9398658372","busInch":"Saroja","busInchNum":"9573060041","busNo":"17","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":93,"mandal":"Porumamilla","village":"Siddavaram","start":"Siddavaram Sachivalayam","inch":"B.MADDULETTI","inchNum":"6301487563","busInch":"Adilakshmi","busInchNum":"6302676890","busNo":"18","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":94,"mandal":"Porumamilla","village":"Tekurpeta","start":"Tekurpeta Sachivalayam 1","inch":"N.Durga Prasad","inchNum":"7799126414","busInch":"Ravanamma","busInchNum":"6305042956","busNo":"19","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":95,"mandal":"Porumamilla","village":"Tekurpeta","start":"Tekurpeta Sachivalayam 2","inch":"Balakrishna","inchNum":"7095803931","busInch":"Suma","busInchNum":"9985443828","busNo":"20","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":96,"mandal":"Porumamilla","village":"Thimmareddipalli","start":"Thimmareddipalli Sachivalayam 1","inch":"C.Tirupalaiah","inchNum":"9966880932","busInch":"Devadas","busInchNum":"9000243528","busNo":"21","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":97,"mandal":"Porumamilla","village":"Thimmareddipalli","start":"Thimmareddipalli Sachivalayam 2","inch":"T Vinod","inchNum":"9121304505","busInch":"Malleswari","busInchNum":"8688423173","busNo":"22","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":98,"mandal":"SAKN","village":"NARASAPURAM","start":"MPDO OFFICE","inch":"B.PRATAP","inchNum":"9963131182","busInch":"S.MAHABOOB CHAND","busInchNum":"7997531066","busNo":"1","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":99,"mandal":"SAKN","village":"NARASAPURAM","start":"MIDDELA (MPP SCHOOL)","inch":"K.MADHUBABU","inchNum":"9849524737","busInch":"N.ADILAKSHI,ADINARAYANA","busInchNum":"9618791661\n6305476038","busNo":"2","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":100,"mandal":"SAKN","village":"RAMPADU","start":"UPPALUR","inch":"C.HANUMANTH","inchNum":"6300132711","busInch":"B.BHAVANI,VENKATAMMA","busInchNum":"9398839948\n8074302427","busNo":"3","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":101,"mandal":"SAKN","village":"GONTUVARIPALLI","start":"GONTUVARIPALLI","inch":"S.CHINNAIAH","inchNum":"9014256403","busInch":"Y.ALAKSHUMAIAH","busInchNum":"7676572606","busNo":"4","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":102,"mandal":"SAKN","village":"VARIKUNTLA","start":"VARIKUNTLA","inch":"C.VENKATESWARLU","inchNum":"7989448037","busInch":"V.NAVEEN,K.SHARMILA","busInchNum":"9381615434\n9704733885","busNo":"5","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":103,"mandal":"SAKN","village":"KATHERAGANDLA","start":"CHENNAVARAM","inch":"S.SUNIL KUMAR","inchNum":"9000404675","busInch":"RAMASUBBAREDDY","busInchNum":"8367635102","busNo":"6","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":104,"mandal":"SAKN","village":"KONDRAJUPALLI","start":"KONDRAJUPALLI","inch":"K.CHATRAPATI","inchNum":"8179050900","busInch":"KC OBAIAH","busInchNum":"7780691011","busNo":"7","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":105,"mandal":"SAKN","village":"SAVISETTYPALLI","start":"SAVISETTYPALLI","inch":"A.SIDDAIAH","inchNum":"8008303140","busInch":"T.NARASIMHULU","busInchNum":"9398108976","busNo":"8","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}},{"id":106,"mandal":"SAKN","village":"AMAGAPALLI","start":"AMBAVARAM,AMAGAMPALLI","inch":"O.SUDARSHAN","inchNum":"9000404672","busInch":"B.CHANDRANEELA;S PAVAN KALYAN","busInchNum":"9390498492\n9390322529","busNo":"9","driver":"","driverNum":"","persons":50,"status":"pending","ts":{}}]</script>
+<script>
+let DATA = JSON.parse(document.getElementById('bus-data').textContent);
+let artifactApi = null;
+const STATUS_LABEL = {pending:'Not Started', started:'Started', reached:'Reached', returned:'Returned'};
+const NEXT = {pending:'started', started:'reached', reached:'returned'};
+const NEXT_LABEL = {pending:'Mark Started', started:'Mark Reached', reached:'Mark Returned'};
+
+function fmtTime(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+}
+
+function populateMandalFilter(){
+  const sel = document.getElementById('mandalFilter');
+  if(sel.options.length > 1) return;
+  const mandals = [...new Set(DATA.map(d=>d.mandal))].sort();
+  mandals.forEach(m=>{
+    const o = document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o);
+  });
+}
+
+function renderSummary(){
+  const counts = {pending:0, started:0, reached:0, returned:0};
+  DATA.forEach(d=>counts[d.status]++);
+  const el = document.getElementById('summary');
+  el.innerHTML = `
+    <div class="stat"><div class="n" style="color:var(--pending)">${counts.pending}</div><div class="l">Not Started</div></div>
+    <div class="stat"><div class="n" style="color:var(--started)">${counts.started}</div><div class="l">Started</div></div>
+    <div class="stat"><div class="n" style="color:var(--reached)">${counts.reached}</div><div class="l">Reached</div></div>
+    <div class="stat"><div class="n" style="color:var(--returned)">${counts.returned}</div><div class="l">Returned</div></div>`;
+}
+
+function renderList(){
+  const mandal = document.getElementById('mandalFilter').value;
+  const status = document.getElementById('statusFilter').value;
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const list = document.getElementById('list');
+  const filtered = DATA.filter(d=>{
+    if(mandal && d.mandal !== mandal) return false;
+    if(status && d.status !== status) return false;
+    if(q){
+      const hay = (d.village+' '+d.start+' '+d.driver+' '+d.busNo+' '+d.busInch+' '+d.inch).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  if(filtered.length === 0){ list.innerHTML = '<div class="empty">No buses match this filter.</div>'; return; }
+  list.innerHTML = filtered.map(d=>{
+    const ts = d.ts || {};
+    let tsLine = '';
+    if(ts.started) tsLine += `Started: ${fmtTime(ts.started)}  `;
+    if(ts.reached) tsLine += `· Reached: ${fmtTime(ts.reached)}  `;
+    if(ts.returned) tsLine += `· Returned: ${fmtTime(ts.returned)}`;
+    let actions = '';
+    if(d.status !== 'returned'){
+      actions += `<button class="act ${d.status==='pending'?'b-start':d.status==='started'?'b-reach':'b-return'}" onclick="advance(${d.id})">${NEXT_LABEL[d.status]}</button>`;
+    }
+    if(d.status !== 'pending'){
+      actions += `<button class="act b-reset" onclick="resetStatus(${d.id})">Reset</button>`;
+    }
+    return `<div class="card">
+      <div class="row1">
+        <div>
+          <div class="village">${esc(d.village)}</div>
+          <div class="mandal">${esc(d.mandal)} · Bus ${d.busNo?esc(d.busNo):'—'}</div>
+        </div>
+        <span class="pill ${d.status}">${STATUS_LABEL[d.status]}</span>
+      </div>
+      <div class="meta">
+        <div><b>Start point:</b> ${esc(d.start)||'—'}</div>
+        <div><b>Boarding incharge:</b> ${esc(d.inch)||'—'} ${d.inchNum?('· '+esc(d.inchNum)):''}</div>
+        <div><b>Bus incharge:</b> ${esc(d.busInch)||'—'} ${d.busInchNum?('· '+esc(d.busInchNum)):''}</div>
+        <div><b>Driver:</b> ${esc(d.driver)||'—'} ${d.driverNum?('· '+esc(d.driverNum)):''} · <b>Persons:</b> ${d.persons}</div>
+        ${tsLine?`<div class="ts">${tsLine}</div>`:''}
+      </div>
+      <div class="actions">${actions}</div>
+    </div>`;
+  }).join('');
+}
+
+function esc(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function advance(id){
+  const d = DATA.find(x=>x.id===id);
+  if(!d) return;
+  const next = NEXT[d.status];
+  if(!next) return;
+  d.status = next;
+  d.ts = d.ts || {};
+  d.ts[next] = new Date().toISOString();
+  renderAll();
+  persist();
+}
+
+function resetStatus(id){
+  const d = DATA.find(x=>x.id===id);
+  if(!d) return;
+  d.status = 'pending';
+  d.ts = {};
+  renderAll();
+  persist();
+}
+
+function renderAll(){
+  populateMandalFilter();
+  renderSummary();
+  renderList();
+}
+
+function buildDocument(){
+  const dataScript = JSON.stringify(DATA);
+  let doc = document.documentElement.outerHTML;
+  doc = doc.replace(/(<script id="bus-data" type="application\/json">)[\s\S]*?(<\/script>)/, '$1'+dataScript+'$2');
+  return '<!DOCTYPE html>\n' + doc;
+}
+
+let saveTimer = null;
+function persist(){
+  if(!artifactApi) return;
+  clearTimeout(saveTimer);
+  const bar = document.getElementById('savebar');
+  bar.classList.add('show');
+  saveTimer = setTimeout(async ()=>{
+    try{ await artifactApi.publish(buildDocument()); }catch(e){}
+    setTimeout(()=>bar.classList.remove('show'), 600);
+  }, 500);
+}
+
+document.getElementById('mandalFilter').addEventListener('change', renderList);
+document.getElementById('statusFilter').addEventListener('change', renderList);
+document.getElementById('search').addEventListener('input', renderList);
+
+renderAll();
+
+(async ()=>{
+  try{
+    if(window.claude && window.claude.use){
+      artifactApi = await window.claude.use('artifact');
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
